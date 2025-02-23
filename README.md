@@ -1,3 +1,1 @@
 # salem-server
-
-Hello there
