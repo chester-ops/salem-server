@@ -1,22 +1,21 @@
 const ApiFeatures = require("../utils/apiFeatures");
 const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
-
-// Get id
-const getId = (req) => {
-  const params = Object.entries(req.params);
-  const id = params[params.length - 1][1];
-  return id;
-};
+const { isValidObjectId } = require("mongoose");
+const { getId } = require("../utils/helpers");
 
 // Delete document
 exports.deleteOne = (Model) =>
   catchAsync(async (req, res, next) => {
+    // Get model name
+    const modelName = Model.modelName.toLowerCase();
+    // Get id
+    const id = getId(req);
     // Find and delete document
-    const doc = await Model.findByIdAndDelete(getId(req));
+    const doc = await Model.findByIdAndDelete(id);
     // Return error if document doesnt exist
     if (!doc)
-      return next(new AppError(`No document found with that name.`, 404));
+      return next(new AppError(`No ${modelName} found with that name.`, 404));
     // Send response
     res.status(204).json({
       status: "success",
@@ -29,6 +28,7 @@ exports.createOne = (Model) =>
   catchAsync(async (req, res, next) => {
     // New document
     const newDoc = new Model(req.body);
+    // Check for file
     if (req.file) newDoc.file = req.file;
     await newDoc.save();
     // Send response
@@ -43,10 +43,23 @@ exports.createOne = (Model) =>
 // Find document
 exports.findOne = (Model) =>
   catchAsync(async (req, res, next) => {
+    // Get model name
+    const modelName = Model.modelName.toLowerCase();
+    let doc;
+    // Set options
+    const options = {};
+    if (req.user) options.user = req.user;
+    // Get id or slug
+    const id = getId(req);
     // Find document
-    const doc = await Model.findById(getId(req), null, { user: req.user });
-    // Return error if document doesnt exist or user isnt permitted
-    if (!doc) return next(new AppError(`No document found with that ID`, 404));
+    if (!isValidObjectId(id))
+      // Using slug
+      doc = await Model.findOne({ slug: id }, null, options);
+    // Using id
+    else doc = await Model.findById(id, null, options);
+    // Return error if document doesnt exist
+    if (!doc)
+      return next(new AppError(`No ${modelName} found with that ID`, 404));
     // Send response
     res.status(200).json({
       status: "success",
@@ -59,14 +72,22 @@ exports.findOne = (Model) =>
 // Update document
 exports.updateOne = (Model) =>
   catchAsync(async (req, res, next) => {
-    // Fetch document
-    const doc = await Model.findByIdAndUpdate(getId(req), req.body, {
-      file: req.file,
+    // Get model name
+    const modelName = Model.modelName.toLowerCase();
+    // Set options
+    const options = {
       new: true,
       runValidators: true,
-    });
+    };
+    // Check for file
+    if (req.file) options.file = req.file;
+    // Get id
+    const id = getId(req);
+    // Fetch document
+    const doc = await Model.findByIdAndUpdate(id, req.body, options);
     // Check if document exists
-    if (!doc) return next(new AppError("No document found with that ID", 404));
+    if (!doc)
+      return next(new AppError(`No ${modelName} found with that ID`, 404));
     // Send response
     res.status(200).json({
       status: "success",
@@ -79,12 +100,9 @@ exports.updateOne = (Model) =>
 // Find all documents
 exports.findAll = (Model) =>
   catchAsync(async (req, res, next) => {
-    // Get filter
-    let filter = {};
-    if (req.filter) filter = { ...req.filter };
     // Construct query
     const features = new ApiFeatures(
-      Model.find(filter, null, { params: req.params }),
+      Model.find({}, null, { params: req.params, user: req.user }),
       req.query
     )
       .filter()

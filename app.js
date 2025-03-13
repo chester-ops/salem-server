@@ -1,3 +1,4 @@
+const cookieParser = require("cookie-parser");
 const express = require("express");
 const morgan = require("morgan");
 const AppError = require("./utils/appError");
@@ -8,7 +9,9 @@ const dotenv = require("dotenv");
 const postRouter = require("./routes/postRoutes");
 const userRouter = require("./routes/userRoutes");
 const commentRouter = require("./routes/commentRoutes");
-const cookieParser = require("cookie-parser");
+const productRouter = require("./routes/productRoutes");
+const reviewRouter = require("./routes/reviewRoutes");
+const orderRouter = require("./routes/orderRoutes");
 
 // Set config file
 dotenv.config({
@@ -22,7 +25,12 @@ const app = express();
 if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
 
 // Body parser
-app.use(express.json({ limit: "10kb" }));
+app.use(
+  express.json({
+    limit: "10kb",
+    verify: (req, res, buf) => (req.rawBody = buf),
+  })
+);
 
 // Cookie parser
 app.use(cookieParser());
@@ -31,6 +39,9 @@ app.use(cookieParser());
 app.use("/api/v1/posts", postRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/comments", commentRouter);
+app.use("/api/v1/products", productRouter);
+app.use("/api/v1/reviews", reviewRouter);
+app.use("/api/v1/orders", orderRouter);
 
 // Not found route
 app.all("*", (req, res, next) => {

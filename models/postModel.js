@@ -1,17 +1,6 @@
 const mongoose = require("mongoose");
-const sharp = require("sharp");
-const Comment = require("../models/commentModel");
-const path = require("path");
-const fs = require("fs").promises;
-
-// Resize and save image
-const saveImage = async (file) => {
-  await sharp(file.buffer)
-    .resize(500, 500)
-    .toFormat("jpeg")
-    .jpeg({ quality: 90 })
-    .toFile(`public/posts/${file.filename}`);
-};
+const { save } = require("../utils/image");
+const { addSlug, filterDocs, deleteRelated } = require("../utils/helpers");
 
 // Post schema
 const postSchema = new mongoose.Schema(
@@ -48,8 +37,9 @@ const postSchema = new mongoose.Schema(
     },
     image: {
       type: String,
-      default: "default-post.jpg",
+      default: "default-post.jpeg",
     },
+    slug: String,
   },
   {
     toJSON: { virtuals: true },
@@ -57,10 +47,8 @@ const postSchema = new mongoose.Schema(
   }
 );
 
-// Slug
-postSchema.virtual("slug").get(function () {
-  return this.title.toLowerCase().replace(" ", "-");
-});
+// Indexing fields
+postSchema.index({ author: 1, createdAt: -1 });
 
 // Comments
 postSchema.virtual("comments", {
@@ -77,9 +65,6 @@ postSchema.pre("findOne", function (next) {
 
 // Populate author
 postSchema.pre(/^find/, function (next) {
-  if (!this.options.user || this.options.user.role !== "admin") {
-    this.find({ published: { $ne: false } });
-  }
   this.populate({
     path: "author",
     select: "name email -_id",
@@ -87,32 +72,20 @@ postSchema.pre(/^find/, function (next) {
   next();
 });
 
-// Save image on update
-postSchema.pre("findOneAndUpdate", async function (next) {
-  if (this.options && this.options.file) await saveImage(this.options.file);
-  next();
-});
+// Add slug
+postSchema.pre("save", addSlug);
 
-// Save image on create
-postSchema.pre("save", async function (next) {
-  if (this.file) await saveImage(this.file);
-  this.file = undefined;
-  next();
-});
+// Retrieve published posts
+postSchema.pre(["find", "findOne"], filterDocs);
 
 // Delete image and comments
-postSchema.pre("findOneAndDelete", async function (next) {
-  const post = await Post.findById(this.getQuery()._id);
-  if (!post) return next();
-  // Delete comments
-  await Comment.deleteMany({ post: post._id });
-  // Delete image
-  await fs
-    .unlink(path.join(__dirname, `../public/posts/${post.image}`))
-    .catch(() => {
-      return;
-    });
-  next();
+postSchema.post("findOneAndDelete", deleteRelated("Comment", "image"));
+
+// Save image
+postSchema.post(["findOneAndUpdate", "save"], async function () {
+  const file = this.options?.file || this.file;
+  if (!file) return;
+  await save(file, { width: 440, height: 260 }, 100, "posts");
 });
 
 // Post model
