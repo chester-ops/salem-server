@@ -1,6 +1,5 @@
 const cookieParser = require("cookie-parser");
 const express = require("express");
-const morgan = require("morgan");
 const AppError = require("./utils/appError");
 const ErrorHandler = require("./utils/errorHandler");
 const dotenv = require("dotenv");
@@ -20,9 +19,6 @@ dotenv.config({
 
 // Start express app
 const app = express();
-
-// Logging
-if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
 
 // Body parser
 app.use(
