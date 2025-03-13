@@ -12,6 +12,12 @@ exports.checkout = catchAsync(async (req, res, next) => {
     body: JSON.stringify({
       email: req.user.email,
       amount: req.body.amount,
+      callback_url: "https:www.google.com",
+      metadata: {
+        email: req.user.email,
+        phone: req.body.phone,
+        cart: req.body.cart,
+      },
     }),
   });
   // Get data
@@ -23,6 +29,7 @@ exports.checkout = catchAsync(async (req, res, next) => {
 });
 
 exports.verifyPayment = (req, res, next) => {
+  // Verify payment signature
   const hash = crypto
     .createHmac("sha512", process.env.PAYSTACK_SECRET)
     .update(req.rawBody)
@@ -30,6 +37,7 @@ exports.verifyPayment = (req, res, next) => {
   if (hash === req.headers["x-paystack-signature"]) {
     const event = req.body;
     if (event.event === "charge.success") {
+      // Create order
       console.log(event.data);
     }
   }
