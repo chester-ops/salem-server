@@ -12,7 +12,7 @@ exports.checkout = catchAsync(async (req, res, next) => {
     body: JSON.stringify({
       email: req.user.email,
       amount: req.body.amount,
-      callback_url: "https:www.google.com",
+      callback_url: "https://www.google.com",
       metadata: {
         email: req.user.email,
         phone: req.body.phone,
